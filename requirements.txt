@@ -3,3 +3,4 @@ ics>=0.7
 beautifulsoup4>=4.10.0
 pytz>=2021.3
 requests>=2.26.0
+Gunicorn
