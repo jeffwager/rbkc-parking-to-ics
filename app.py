@@ -1,4 +1,4 @@
-from flask import Flask, Response
+from flask import Flask, Response, request
 from ics import Calendar, Event
 from datetime import datetime, timedelta
 from typing import List
@@ -7,9 +7,18 @@ import pytz
 import requests
 
 # Function to parse HTML and generate a list of Event objects
-def parse_html_to_events_from_url(url: str) -> List[Event]:
-    # Fetch the HTML content from the URL
-    response = requests.get(url)
+def parse_html_to_events_from_url(url: str, street: str, date: datetime) -> List[Event]:
+    # Prepare the POST request payload
+    payload = {
+        "STREETNM": street,
+        "toDay": date.strftime("%d"),
+        "toMonth": date.strftime("%m"),
+        "toYear": date.strftime("%Y"),
+        "search": "continue"
+    }
+
+    # Fetch the HTML content from the URL using a POST request
+    response = requests.post(url, data=payload)
     response.raise_for_status()  # Raise an error for HTTP issues
     html_stream = response.text
 
@@ -60,9 +69,17 @@ app = Flask(__name__)
 
 @app.route('/calendar.ics')
 def serve_calendar() -> Response:
+    # Get the street name from query parameters
+    street = request.args.get("street", "")
+    if not street:
+        return Response("Missing 'street' parameter", status=400)
+
+    # Calculate yesterday's date
+    yesterday = datetime.now() - timedelta(days=1)
+
     # Parse events from the given URL
-    url = "https://blah.com/input.html"
-    events = parse_html_to_events_from_url(url)
+    url = "https://www.rbkc.gov.uk/Parking/suspensionresults.asp"
+    events = parse_html_to_events_from_url(url, street, yesterday)
 
     # Create an ICS calendar
     calendar = Calendar()
