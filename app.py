@@ -56,7 +56,7 @@ def parse_html_to_events_from_url(url: str, street: str, date: datetime) -> List
         event = Event()
         event.name = f"{suspension_type} - {street_name}"
         event.begin = start
-        event.end = end + timedelta(days=1)  # ICS end date is exclusive, so add 1 day
+        event.end = end  # No need to add 1 day; ICS library handles exclusive end date for all-day events
         event.make_all_day()
         event.description = suspension_reason
         event.location = location
