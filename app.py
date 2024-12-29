@@ -32,7 +32,6 @@ def parse_html_to_events_from_url(url: str, street: str, date: datetime) -> List
 
     # Extract rows from the table
     rows = table.find_all("tr")[1:]  # Skip header row
-    london_tz = pytz.timezone("Europe/London")
     for row in rows:
         cells = row.find_all("td")
         if len(cells) < 7:
@@ -46,18 +45,19 @@ def parse_html_to_events_from_url(url: str, street: str, date: datetime) -> List
         from_date = cells[4].get_text(strip=True)
         to_date = cells[5].get_text(strip=True)
 
-        # Parse dates with timezone
+        # Parse dates
         try:
-            start = london_tz.localize(datetime.strptime(from_date, "%d/%m/%Y"))
-            end = london_tz.localize(datetime.strptime(to_date, "%d/%m/%Y"))
+            start = datetime.strptime(from_date, "%d/%m/%Y").date()
+            end = datetime.strptime(to_date, "%d/%m/%Y").date()
         except ValueError:
             continue
 
-        # Create an Event object
+        # Create an all-day Event object
         event = Event()
         event.name = f"{suspension_type} - {street_name}"
         event.begin = start
-        event.end = end
+        event.end = end + timedelta(days=1)  # ICS end date is exclusive, so add 1 day
+        event.make_all_day()
         event.description = suspension_reason
         event.location = location
         events.append(event)
