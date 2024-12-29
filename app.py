@@ -69,21 +69,23 @@ app = Flask(__name__)
 
 @app.route('/calendar.ics')
 def serve_calendar() -> Response:
-    # Get the street name from query parameters
-    street = request.args.get("street", "")
-    if not street:
-        return Response("Missing 'street' parameter", status=400)
+    # Get the street names from query parameters (supports multiple values)
+    streets = request.args.getlist("street")
+    if not streets:
+        return Response("Missing 'street' parameter(s)", status=400)
 
     # Calculate yesterday's date
     yesterday = datetime.now() - timedelta(days=1)
 
-    # Parse events from the given URL
+    # Parse events from the given URL for each street
     url = "https://www.rbkc.gov.uk/Parking/suspensionresults.asp"
-    events = parse_html_to_events_from_url(url, street, yesterday)
+    all_events = []
+    for street in streets:
+        all_events.extend(parse_html_to_events_from_url(url, street, yesterday))
 
     # Create an ICS calendar
     calendar = Calendar()
-    for event in events:
+    for event in all_events:
         calendar.events.add(event)
 
     # Convert calendar to ICS string using the Calendar's "serialize" method
