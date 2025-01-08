@@ -17,9 +17,18 @@ def parse_html_to_events_from_url(url: str, street: str, date: datetime) -> List
         "search": "continue"
     }
 
+    # Add user-agent header to simulate a browser
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
     # Fetch the HTML content from the URL using a POST request
-    response = requests.post(url, data=payload)
-    response.raise_for_status()  # Raise an error for HTTP issues
+    response = requests.post(url, data=payload, headers=headers)
+
+    # If the request fails, return the exact output from the server
+    if not response.ok:
+        raise ValueError(f"HTTP Error {response.status_code}: {response.text}")
+
     html_stream = response.text
 
     soup = BeautifulSoup(html_stream, "html.parser")
@@ -81,7 +90,10 @@ def serve_calendar() -> Response:
     url = "https://www.rbkc.gov.uk/Parking/suspensionresults.asp"
     all_events = []
     for street in streets:
-        all_events.extend(parse_html_to_events_from_url(url, street, yesterday))
+        try:
+            all_events.extend(parse_html_to_events_from_url(url, street, yesterday))
+        except ValueError as e:
+            return Response(str(e), status=500)
 
     # Create an ICS calendar
     calendar = Calendar()
