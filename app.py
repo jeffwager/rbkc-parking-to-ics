@@ -7,23 +7,13 @@ import pytz
 import requests
 
 # Function to parse HTML and generate a list of Event objects
-def parse_html_to_events_from_url(url: str, street: str, date: datetime) -> List[Event]:
-    # Prepare the POST request payload
-    payload = {
-        "STREETNM": street,
-        "toDay": date.strftime("%d"),
-        "toMonth": date.strftime("%m"),
-        "toYear": date.strftime("%Y"),
-        "search": "continue"
-    }
-
-    # Add user-agent header to simulate a browser
+def parse_html_to_events_from_url(url: str) -> List[Event]:
+    # Fetch the HTML content from the URL using a GET request
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
 
-    # Fetch the HTML content from the URL using a POST request
-    response = requests.post(url, data=payload, headers=headers)
+    response = requests.get(url, headers=headers)
 
     # If the request fails, return the exact output from the server
     if not response.ok:
@@ -85,13 +75,15 @@ def serve_calendar() -> Response:
 
     # Calculate yesterday's date
     yesterday = datetime.now() - timedelta(days=1)
+    date_str = yesterday.strftime("%Y%m%d")
 
     # Parse events from the given URL for each street
-    url = "https://www.rbkc.gov.uk/Parking/suspensionresults.asp"
+    base_url = "https://www.rbkc.gov.uk/parking/suspensionresults.asp"
     all_events = []
     for street in streets:
+        url = f"{base_url}?Street={street}&Date={date_str}"
         try:
-            all_events.extend(parse_html_to_events_from_url(url, street, yesterday))
+            all_events.extend(parse_html_to_events_from_url(url))
         except ValueError as e:
             return Response(str(e), status=500)
 
