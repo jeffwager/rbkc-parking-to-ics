@@ -1,10 +1,18 @@
 from flask import Flask, Response, request
 from ics import Calendar, Event
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 from bs4 import BeautifulSoup
 import pytz
 import requests
+import re
+import json
+from urllib.parse import quote
+
+
+# Create Flask app
+app = Flask(__name__)
+
 
 # Function to parse HTML and generate a list of Event objects
 def parse_html_to_events_from_url(url: str) -> List[Event]:
@@ -63,9 +71,6 @@ def parse_html_to_events_from_url(url: str) -> List[Event]:
 
     return events
 
-# Create Flask app
-app = Flask(__name__)
-
 @app.route('/calendar.ics')
 def serve_calendar() -> Response:
     # Get the street names from query parameters (supports multiple values)
@@ -97,6 +102,78 @@ def serve_calendar() -> Response:
 
     # Serve the ICS file as a response
     return Response(ics_content, mimetype='text/calendar', headers={"Content-Disposition": "attachment; filename=calendar.ics"})
+
+
+def _parse_iso_utc(s: str) -> datetime:
+    s = s.strip()
+    if s.endswith("Z"):
+        s = s.replace("Z", "+00:00")
+    dt = datetime.fromisoformat(s)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt
+
+
+def parse_timetable(js: str) -> Calendar:
+    """
+    Extract JSON from JS variable and create calendar.
+    Looks for: var timetableData = { ... };
+    """
+    match = re.search(r"var\s+timetableData\s*=\s*(\{.*?\});", js, re.DOTALL)
+    if not match:
+        raise ValueError("timetableData not found in JS")
+
+    data = json.loads(match.group(1))
+    cal = Calendar()
+
+    for entry in data.get("timetables", []):
+        ev = Event()
+        ev.name = entry.get("name") or "Lesson"
+        ev.begin = _parse_iso_utc(entry["startTime"])
+        ev.end = _parse_iso_utc(entry["endTime"])
+        ev.location = entry.get("location")
+        desc_parts = []
+        if entry.get("staffName"):
+            desc_parts.append(entry["staffName"])
+        if desc_parts:
+            ev.description = " | ".join(desc_parts)
+        cal.events.add(ev)
+    return cal
+
+
+def fetch_timetable(login: str, password: str) -> str:
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+    session = requests.Session()
+
+    login_data = {'client_id': login, 'client_secret': password, 'set_session_variables': 'true', 'stay_logged_in': False}
+
+    r = session.post("https://bat.msp.thomas-s.co.uk/api/auth", data=quote(json.dumps(login_data)), headers=headers)
+    r.raise_for_status()
+    j = json.loads(r.text)
+    if not j.get('success', False):
+        raise ValueError(f"Excepted success, got: {r.text}")
+
+    r = session.get("https://bat.msp.thomas-s.co.uk/showme/timetable", headers=headers)
+    r.raise_for_status()
+    # print(r.text)
+    return r.text
+
+
+@app.route("/tomcal.ics")
+def serve_tomcal():
+    login = request.args.get("l")
+    password = request.args.get("p")
+    if not login or not password:
+        return Response("Missing login or password", status=400)
+
+    html = fetch_timetable(login, password)
+    cal = parse_timetable(html)
+    ics = cal.serialize()
+
+    return Response(ics, mimetype="text/calendar", headers={"Content-Disposition": "attachment; filename=tomcal.ics"})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
