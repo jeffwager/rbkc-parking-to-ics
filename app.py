@@ -85,12 +85,12 @@ def serve_calendar() -> Response:
     # Parse events from the given URL for each street
     base_url = "https://www.rbkc.gov.uk/parking/suspensionresults.asp"
     all_events = []
-    for street in streets:
-        url = f"{base_url}?Street={street}&Date={date_str}"
-        try:
-            all_events.extend(parse_html_to_events_from_url(url))
-        except ValueError as e:
-            return Response(str(e), status=500)
+    # for street in streets:
+    #     url = f"{base_url}?Street={street}&Date={date_str}"
+    #     try:
+    #         all_events.extend(parse_html_to_events_from_url(url))
+    #     except ValueError as e:
+    #         return Response(str(e), status=500)
 
     # Create an ICS calendar
     calendar = Calendar()
