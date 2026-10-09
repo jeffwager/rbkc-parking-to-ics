@@ -71,7 +71,7 @@ def parse_html_to_events_from_url(url: str) -> List[Event]:
 
     return events
 
-@app.route('/calendar.ics')
+@app.route('/rbkc-parking.ics')
 def serve_calendar() -> Response:
     # Get the street names from query parameters (supports multiple values)
     streets = request.args.getlist("street")
@@ -168,9 +168,10 @@ def serve_tomcal():
     if not login or not password:
         return Response("Missing login or password", status=400)
 
-    html = fetch_timetable(login, password)
-    cal = parse_timetable(html)
-    ics = cal.serialize()
+    # html = fetch_timetable(login, password)
+    # cal = parse_timetable(html)
+    # ics = cal.serialize()
+    ics = Calendar().serialize()
 
     return Response(ics, mimetype="text/calendar", headers={"Content-Disposition": "attachment; filename=tomcal.ics"})
 
